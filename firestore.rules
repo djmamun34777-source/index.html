@@ -1,0 +1,487 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 1. Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- GLOBAL HARDENED HELPERS ---
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidTimestamp(ts) {
+      return ts is timestamp && ts <= request.time;
+    }
+
+    // Bootstrapped admin verified via email + email_verified (zero DB lookups; safe in list rules)
+    function isBootstrapAdmin() {
+      return isSignedIn() &&
+        ('email' in request.auth.token) &&
+        ('email_verified' in request.auth.token) &&
+        request.auth.token.email == 'djmamun34777@gmail.com' &&
+        request.auth.token.email_verified == true;
+    }
+
+    // Full admin check for single-document operations
+    function isAdmin() {
+      return isBootstrapAdmin() ||
+        (isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)));
+    }
+
+    function isValidMemberUidList(uids) {
+      return uids is list && uids.size() <= 7 && (uids.size() == 0 || uids[0] is string);
+    }
+
+    function isValidParticipantUids(uids) {
+      return uids is list && uids.size() >= 1 && uids.size() <= 2 && uids[0] is string;
+    }
+
+    // --- VALIDATION BLUEPRINTS (ANTI-UPDATE-GAP) ---
+
+    function isValidAdmin(data) {
+      return data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 60 &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidSlot(data) {
+      return data.deviceId is string && isValidId(data.deviceId) && data.deviceId.size() <= 64 &&
+        data.ownerUid is string && data.ownerUid.size() >= 1 && data.ownerUid.size() <= 128 &&
+        data.deviceName is string && data.deviceName.size() >= 1 && data.deviceName.size() <= 40 &&
+        isValidMemberUidList(data.memberUids) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidDevice(data) {
+      return data.ownerUid is string && data.ownerUid.size() >= 1 && data.ownerUid.size() <= 128 &&
+        data.deviceName is string && data.deviceName.size() >= 1 && data.deviceName.size() <= 40 &&
+        data.slotNumber is int && data.slotNumber >= 0 && data.slotNumber <= 6 &&
+        data.status is string && data.status in ['PENDING', 'APPROVED', 'REVOKED'] &&
+        data.online is bool &&
+        data.currentChannel is int && data.currentChannel >= 1 && data.currentChannel <= 6 &&
+        data.mode is string && data.mode in ['GROUP', 'PRIVATE'] &&
+        data.privateTargetDeviceId is string && data.privateTargetDeviceId.size() <= 64 &&
+        data.batteryLevel is int && data.batteryLevel >= 0 && data.batteryLevel <= 100 &&
+        data.networkType is string && data.networkType in ['WIFI', 'CELLULAR', 'OFFLINE'] &&
+        data.adminDevice is bool &&
+        isValidMemberUidList(data.memberUids) &&
+        data.lastSeenAt is timestamp &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidChannel(data) {
+      return data.channelNumber is int && data.channelNumber >= 1 && data.channelNumber <= 6 &&
+        data.name is string && data.name.size() >= 1 && data.name.size() <= 40 &&
+        data.activeSpeakerDeviceId is string && data.activeSpeakerDeviceId.size() <= 64 &&
+        data.activeSpeakerName is string && data.activeSpeakerName.size() <= 40 &&
+        data.activeSpeakerUid is string && data.activeSpeakerUid.size() <= 128 &&
+        (!('pttLockedAt' in data) || data.pttLockedAt == null || isValidTimestamp(data.pttLockedAt)) &&
+        isValidMemberUidList(data.memberUids) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidPrivateSession(data) {
+      return data.deviceAId is string && isValidId(data.deviceAId) && data.deviceAId.size() <= 64 &&
+        data.deviceBId is string && isValidId(data.deviceBId) && data.deviceBId.size() <= 64 &&
+        isValidParticipantUids(data.participantUids) &&
+        data.activeSpeakerDeviceId is string && data.activeSpeakerDeviceId.size() <= 64 &&
+        data.activeSpeakerName is string && data.activeSpeakerName.size() <= 40 &&
+        data.activeSpeakerUid is string && data.activeSpeakerUid.size() <= 128 &&
+        (!('pttLockedAt' in data) || data.pttLockedAt == null || isValidTimestamp(data.pttLockedAt)) &&
+        data.active is bool &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidWebRtcSignal(data) {
+      return data.roomId is string && data.roomId.size() >= 1 && data.roomId.size() <= 128 &&
+        data.fromDeviceId is string && isValidId(data.fromDeviceId) && data.fromDeviceId.size() <= 64 &&
+        data.toDeviceId is string && isValidId(data.toDeviceId) && data.toDeviceId.size() <= 64 &&
+        data.fromUid is string && data.fromUid.size() >= 1 && data.fromUid.size() <= 128 &&
+        data.toUid is string && data.toUid.size() >= 1 && data.toUid.size() <= 128 &&
+        data.signalType is string && data.signalType in ['OFFER', 'ANSWER', 'ICE', 'BYE'] &&
+        data.sdp is string && data.sdp.size() <= 32768 &&
+        data.iceCandidate is string && data.iceCandidate.size() <= 2048 &&
+        data.iceSdpMid is string && data.iceSdpMid.size() <= 64 &&
+        data.iceSdpMLineIndex is int && data.iceSdpMLineIndex >= -1 && data.iceSdpMLineIndex <= 16 &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidIceConfig(data) {
+      return data.stunUrls is list && data.stunUrls.size() >= 1 && data.stunUrls.size() <= 6 &&
+        data.stunUrls[0] is string &&
+        data.turnUrl is string && data.turnUrl.size() <= 256 &&
+        data.turnUsername is string && data.turnUsername.size() <= 128 &&
+        data.turnCredential is string && data.turnCredential.size() <= 256 &&
+        data.sfuEnabled is bool &&
+        data.sfuUrl is string && data.sfuUrl.size() <= 256 &&
+        isValidMemberUidList(data.memberUids) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidOtpVerification(data) {
+      return data.email is string && data.email.size() >= 3 && data.email.size() <= 128 &&
+        data.deviceId is string && isValidId(data.deviceId) && data.deviceId.size() <= 64 &&
+        data.otpHash is string && data.otpHash.size() == 64 &&
+        data.verified is bool &&
+        data.attempts is int && data.attempts >= 0 && data.attempts <= 6 &&
+        data.expiresAtEpochMs is int && data.expiresAtEpochMs > 0 &&
+        data.deliveryStatus is string && data.deliveryStatus in ['PENDING', 'SENT', 'FAILED'] &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    // --- COLLECTION RULES ---
+
+    // 1. Admins
+    match /admins/{adminUid} {
+      allow get: if isSignedIn() && isValidId(adminUid) && (request.auth.uid == adminUid || isAdmin());
+      allow list: if isBootstrapAdmin();
+
+      allow create: if isBootstrapAdmin() &&
+        isValidId(adminUid) &&
+        isValidAdmin(incoming()) &&
+        incoming().keys().hasAll(['displayName', 'createdAt', 'updatedAt']) &&
+        incoming().keys().hasOnly(['displayName', 'createdAt', 'updatedAt']) &&
+        isValidTimestamp(incoming().createdAt) &&
+        isValidTimestamp(incoming().updatedAt);
+
+      allow update: if isBootstrapAdmin() &&
+        isValidId(adminUid) &&
+        isValidAdmin(incoming()) &&
+        incoming().createdAt == existing().createdAt &&
+        isValidTimestamp(incoming().updatedAt) &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'updatedAt']);
+
+      allow delete: if isBootstrapAdmin() && isValidId(adminUid);
+    }
+
+    // 2. Fixed 6 Device Slots (slotId strictly 1..6)
+    match /slots/{slotId} {
+      allow get: if isSignedIn() && slotId.matches('^[1-6]$') &&
+        (isAdmin() || existing().ownerUid == request.auth.uid || request.auth.uid in existing().memberUids);
+
+      allow list: if isSignedIn() &&
+        (isBootstrapAdmin() || resource.data.ownerUid == request.auth.uid || request.auth.uid in resource.data.memberUids);
+
+      allow create: if isAdmin() &&
+        slotId.matches('^[1-6]$') &&
+        isValidSlot(incoming()) &&
+        incoming().keys().hasAll(['deviceId', 'ownerUid', 'deviceName', 'memberUids', 'createdAt', 'updatedAt']) &&
+        incoming().keys().hasOnly(['deviceId', 'ownerUid', 'deviceName', 'memberUids', 'createdAt', 'updatedAt']) &&
+        isValidTimestamp(incoming().createdAt) &&
+        isValidTimestamp(incoming().updatedAt);
+
+      allow update: if isAdmin() &&
+        slotId.matches('^[1-6]$') &&
+        isValidSlot(incoming()) &&
+        incoming().createdAt == existing().createdAt &&
+        isValidTimestamp(incoming().updatedAt) &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['deviceId', 'ownerUid', 'deviceName', 'memberUids', 'updatedAt']);
+
+      allow delete: if isAdmin() && slotId.matches('^[1-6]$');
+    }
+
+    // 3. Devices
+    match /devices/{deviceId} {
+      allow get: if isSignedIn() && isValidId(deviceId) &&
+        (isAdmin() || existing().ownerUid == request.auth.uid || request.auth.uid in existing().memberUids);
+
+      allow list: if isSignedIn() &&
+        (isBootstrapAdmin() || resource.data.ownerUid == request.auth.uid || request.auth.uid in resource.data.memberUids);
+
+      allow create: if isSignedIn() &&
+        isValidId(deviceId) &&
+        isValidDevice(incoming()) &&
+        incoming().keys().hasAll([
+          'ownerUid', 'deviceName', 'slotNumber', 'status', 'online',
+          'currentChannel', 'mode', 'privateTargetDeviceId', 'batteryLevel',
+          'networkType', 'adminDevice', 'memberUids', 'lastSeenAt', 'createdAt', 'updatedAt'
+        ]) &&
+        incoming().keys().hasOnly([
+          'ownerUid', 'deviceName', 'slotNumber', 'status', 'online',
+          'currentChannel', 'mode', 'privateTargetDeviceId', 'batteryLevel',
+          'networkType', 'adminDevice', 'memberUids', 'lastSeenAt', 'createdAt', 'updatedAt'
+        ]) &&
+        isValidTimestamp(incoming().createdAt) &&
+        isValidTimestamp(incoming().updatedAt) &&
+        isValidTimestamp(incoming().lastSeenAt) &&
+        (
+          isAdmin() ||
+          (
+            incoming().ownerUid == request.auth.uid &&
+            incoming().status == 'PENDING' &&
+            incoming().slotNumber == 0 &&
+            incoming().adminDevice == false &&
+            incoming().memberUids == [request.auth.uid]
+          )
+        );
+
+      allow update: if isSignedIn() &&
+        isValidId(deviceId) &&
+        isValidDevice(incoming()) &&
+        incoming().ownerUid == existing().ownerUid &&
+        incoming().createdAt == existing().createdAt &&
+        isValidTimestamp(incoming().updatedAt) &&
+        isValidTimestamp(incoming().lastSeenAt) &&
+        (
+          // Tier 1: Admin full device management
+          (
+            isAdmin() &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'deviceName', 'slotNumber', 'status', 'online', 'currentChannel',
+              'mode', 'privateTargetDeviceId', 'batteryLevel', 'networkType',
+              'adminDevice', 'memberUids', 'lastSeenAt', 'updatedAt'
+            ])
+          ) ||
+          // Tier 2: Approved device owner updating radio state & telemetry
+          (
+            existing().ownerUid == request.auth.uid &&
+            existing().status == 'APPROVED' &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'deviceName', 'online', 'currentChannel', 'mode',
+              'privateTargetDeviceId', 'batteryLevel', 'networkType',
+              'lastSeenAt', 'updatedAt'
+            ])
+          ) ||
+          // Tier 3: Pending device owner updating name & presence only
+          (
+            existing().ownerUid == request.auth.uid &&
+            existing().status == 'PENDING' &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'deviceName', 'online', 'batteryLevel', 'networkType',
+              'lastSeenAt', 'updatedAt'
+            ])
+          )
+        );
+
+      allow delete: if isSignedIn() && isValidId(deviceId) &&
+        (isAdmin() || existing().ownerUid == request.auth.uid);
+    }
+
+    // 4. Channels (Fixed 6 Group Channels: channel_1 .. channel_6)
+    match /channels/{channelId} {
+      allow get: if isSignedIn() && channelId.matches('^channel_[1-6]$') &&
+        (isAdmin() || request.auth.uid in existing().memberUids);
+
+      allow list: if isSignedIn() &&
+        (isBootstrapAdmin() || request.auth.uid in resource.data.memberUids);
+
+      allow create: if isAdmin() &&
+        channelId.matches('^channel_[1-6]$') &&
+        isValidChannel(incoming()) &&
+        incoming().keys().hasAll([
+          'channelNumber', 'name', 'activeSpeakerDeviceId',
+          'activeSpeakerName', 'activeSpeakerUid', 'memberUids', 'createdAt', 'updatedAt'
+        ]) &&
+        incoming().keys().hasOnly([
+          'channelNumber', 'name', 'activeSpeakerDeviceId',
+          'activeSpeakerName', 'activeSpeakerUid', 'pttLockedAt', 'memberUids', 'createdAt', 'updatedAt'
+        ]) &&
+        isValidTimestamp(incoming().createdAt) &&
+        isValidTimestamp(incoming().updatedAt);
+
+      allow update: if isSignedIn() &&
+        channelId.matches('^channel_[1-6]$') &&
+        isValidChannel(incoming()) &&
+        incoming().channelNumber == existing().channelNumber &&
+        incoming().createdAt == existing().createdAt &&
+        isValidTimestamp(incoming().updatedAt) &&
+        (
+          // Tier 1: Admin channel configuration & membership sync
+          (
+            isAdmin() &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'name', 'activeSpeakerDeviceId', 'activeSpeakerName',
+              'activeSpeakerUid', 'pttLockedAt', 'memberUids', 'updatedAt'
+            ])
+          ) ||
+          // Tier 2: Approved member acquiring or releasing PTT floor
+          (
+            request.auth.uid in existing().memberUids &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'activeSpeakerDeviceId', 'activeSpeakerName',
+              'activeSpeakerUid', 'pttLockedAt', 'updatedAt'
+            ]) &&
+            (incoming().activeSpeakerUid == request.auth.uid || incoming().activeSpeakerUid == '')
+          )
+        );
+
+      allow delete: if false;
+    }
+
+    // 5. Private 1-to-1 Sessions (strictly isolated to the two participants or admin)
+    match /private_sessions/{sessionId} {
+      allow get: if isSignedIn() && isValidId(sessionId) &&
+        (isAdmin() || request.auth.uid in existing().participantUids);
+
+      allow list: if isSignedIn() &&
+        (isBootstrapAdmin() || request.auth.uid in resource.data.participantUids);
+
+      allow create: if isSignedIn() &&
+        isValidId(sessionId) &&
+        isValidPrivateSession(incoming()) &&
+        (isAdmin() || request.auth.uid in incoming().participantUids) &&
+        incoming().keys().hasAll([
+          'deviceAId', 'deviceBId', 'participantUids', 'activeSpeakerDeviceId',
+          'activeSpeakerName', 'activeSpeakerUid', 'active', 'createdAt', 'updatedAt'
+        ]) &&
+        incoming().keys().hasOnly([
+          'deviceAId', 'deviceBId', 'participantUids', 'activeSpeakerDeviceId',
+          'activeSpeakerName', 'activeSpeakerUid', 'pttLockedAt', 'active', 'createdAt', 'updatedAt'
+        ]) &&
+        isValidTimestamp(incoming().createdAt) &&
+        isValidTimestamp(incoming().updatedAt);
+
+      allow update: if isSignedIn() &&
+        isValidId(sessionId) &&
+        isValidPrivateSession(incoming()) &&
+        incoming().deviceAId == existing().deviceAId &&
+        incoming().deviceBId == existing().deviceBId &&
+        incoming().createdAt == existing().createdAt &&
+        isValidTimestamp(incoming().updatedAt) &&
+        (
+          // Tier 1: Admin session control
+          (
+            isAdmin() &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'participantUids', 'activeSpeakerDeviceId', 'activeSpeakerName',
+              'activeSpeakerUid', 'pttLockedAt', 'active', 'updatedAt'
+            ])
+          ) ||
+          // Tier 2: Participant PTT floor & active toggle
+          (
+            request.auth.uid in existing().participantUids &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'activeSpeakerDeviceId', 'activeSpeakerName',
+              'activeSpeakerUid', 'pttLockedAt', 'active', 'updatedAt'
+            ]) &&
+            (incoming().activeSpeakerUid == request.auth.uid || incoming().activeSpeakerUid == '')
+          )
+        );
+
+      allow delete: if isSignedIn() && isValidId(sessionId) &&
+        (isAdmin() || request.auth.uid in existing().participantUids);
+    }
+
+    // 6. WebRTC Signaling Messages (write-once, delete-on-consume, scoped to sender/recipient)
+    match /webrtc_signals/{signalId} {
+      allow get: if isSignedIn() && isValidId(signalId) &&
+        (existing().toUid == request.auth.uid || existing().fromUid == request.auth.uid || isAdmin());
+
+      allow list: if isSignedIn() &&
+        (resource.data.toUid == request.auth.uid || resource.data.fromUid == request.auth.uid || isBootstrapAdmin());
+
+      allow create: if isSignedIn() &&
+        isValidId(signalId) &&
+        isValidWebRtcSignal(incoming()) &&
+        incoming().fromUid == request.auth.uid &&
+        incoming().keys().hasAll([
+          'roomId', 'fromDeviceId', 'toDeviceId', 'fromUid', 'toUid',
+          'signalType', 'sdp', 'iceCandidate', 'iceSdpMid', 'iceSdpMLineIndex', 'createdAt'
+        ]) &&
+        incoming().keys().hasOnly([
+          'roomId', 'fromDeviceId', 'toDeviceId', 'fromUid', 'toUid',
+          'signalType', 'sdp', 'iceCandidate', 'iceSdpMid', 'iceSdpMLineIndex', 'createdAt'
+        ]) &&
+        isValidTimestamp(incoming().createdAt);
+
+      allow update: if false;
+
+      allow delete: if isSignedIn() && isValidId(signalId) &&
+        (existing().toUid == request.auth.uid || existing().fromUid == request.auth.uid || isAdmin());
+    }
+
+    // 7. Admin ICE / STUN / TURN / SFU Configuration
+    match /settings/{configId} {
+      allow get: if isSignedIn() && configId == 'ice_config' &&
+        (isAdmin() || request.auth.uid in existing().memberUids);
+
+      allow list: if isSignedIn() &&
+        (isBootstrapAdmin() || request.auth.uid in resource.data.memberUids);
+
+      allow create: if isAdmin() &&
+        configId == 'ice_config' &&
+        isValidIceConfig(incoming()) &&
+        incoming().keys().hasAll([
+          'stunUrls', 'turnUrl', 'turnUsername', 'turnCredential',
+          'sfuEnabled', 'sfuUrl', 'memberUids', 'createdAt', 'updatedAt'
+        ]) &&
+        incoming().keys().hasOnly([
+          'stunUrls', 'turnUrl', 'turnUsername', 'turnCredential',
+          'sfuEnabled', 'sfuUrl', 'memberUids', 'createdAt', 'updatedAt'
+        ]) &&
+        isValidTimestamp(incoming().createdAt) &&
+        isValidTimestamp(incoming().updatedAt);
+
+      allow update: if isAdmin() &&
+        configId == 'ice_config' &&
+        isValidIceConfig(incoming()) &&
+        incoming().createdAt == existing().createdAt &&
+        isValidTimestamp(incoming().updatedAt) &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'stunUrls', 'turnUrl', 'turnUsername', 'turnCredential',
+          'sfuEnabled', 'sfuUrl', 'memberUids', 'updatedAt'
+        ]);
+
+      allow delete: if false;
+    }
+
+    // 8. Google Email 6-Digit OTP Verification Challenges (strictly self-owned, zero enumeration)
+    match /otp_verifications/{uid} {
+      allow get: if isSignedIn() && isValidId(uid) && request.auth.uid == uid;
+      allow list: if false;
+
+      allow create: if isSignedIn() &&
+        isValidId(uid) &&
+        request.auth.uid == uid &&
+        ('email' in request.auth.token) &&
+        isValidOtpVerification(incoming()) &&
+        incoming().email == request.auth.token.email &&
+        incoming().keys().hasAll([
+          'email', 'deviceId', 'otpHash', 'verified', 'attempts',
+          'expiresAtEpochMs', 'deliveryStatus', 'createdAt', 'updatedAt'
+        ]) &&
+        incoming().keys().hasOnly([
+          'email', 'deviceId', 'otpHash', 'verified', 'attempts',
+          'expiresAtEpochMs', 'deliveryStatus', 'createdAt', 'updatedAt'
+        ]) &&
+        isValidTimestamp(incoming().createdAt) &&
+        isValidTimestamp(incoming().updatedAt);
+
+      allow update: if isSignedIn() &&
+        isValidId(uid) &&
+        request.auth.uid == uid &&
+        isValidOtpVerification(incoming()) &&
+        incoming().email == existing().email &&
+        incoming().createdAt == existing().createdAt &&
+        isValidTimestamp(incoming().updatedAt) &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'deviceId', 'otpHash', 'verified', 'attempts',
+          'expiresAtEpochMs', 'deliveryStatus', 'updatedAt'
+        ]);
+
+      allow delete: if isSignedIn() && isValidId(uid) && request.auth.uid == uid;
+    }
+  }
+}

@@ -1,0 +1,174 @@
+{
+  "entities": {
+    "AdminUser": {
+      "title": "AdminUser",
+      "description": "Authorized administrator account for Mamun Walkie Talkie.",
+      "type": "object",
+      "properties": {
+        "displayName": { "type": "string", "description": "Admin display label." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp written via FieldValue.serverTimestamp()." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp written via FieldValue.serverTimestamp()." }
+      },
+      "required": ["displayName", "createdAt", "updatedAt"]
+    },
+    "DeviceSlot": {
+      "title": "DeviceSlot",
+      "description": "Fixed slot 1..6 enforcing the 6-device family cap.",
+      "type": "object",
+      "properties": {
+        "deviceId": { "type": "string", "description": "Assigned unique Device ID." },
+        "ownerUid": { "type": "string", "description": "Firebase Auth UID of the device owner." },
+        "deviceName": { "type": "string", "description": "Human-friendly device name." },
+        "memberUids": { "type": "array", "description": "Denormalized list of approved family UIDs (max 7)." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp written via FieldValue.serverTimestamp()." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp written via FieldValue.serverTimestamp()." }
+      },
+      "required": ["deviceId", "ownerUid", "deviceName", "memberUids", "createdAt", "updatedAt"]
+    },
+    "WalkieDevice": {
+      "title": "WalkieDevice",
+      "description": "Registered family walkie-talkie device with approval status, channel, mode, and live telemetry.",
+      "type": "object",
+      "properties": {
+        "ownerUid": { "type": "string", "description": "Firebase Auth UID of the signed-in device owner." },
+        "deviceName": { "type": "string", "description": "Editable device callsign/name." },
+        "slotNumber": { "type": "integer", "description": "0 if pending, 1..6 when approved into a family slot." },
+        "status": { "type": "string", "enum": ["PENDING", "APPROVED", "REVOKED"], "description": "Admin approval state." },
+        "online": { "type": "boolean", "description": "Whether device is actively connected." },
+        "currentChannel": { "type": "integer", "description": "Active channel number 1..6." },
+        "mode": { "type": "string", "enum": ["GROUP", "PRIVATE"], "description": "Active radio communication mode." },
+        "privateTargetDeviceId": { "type": "string", "description": "Target Device ID in Private Mode, or empty string." },
+        "batteryLevel": { "type": "integer", "description": "Device battery percentage 0..100." },
+        "networkType": { "type": "string", "enum": ["WIFI", "CELLULAR", "OFFLINE"], "description": "Active network transport." },
+        "adminDevice": { "type": "boolean", "description": "Whether this device belongs to an admin." },
+        "memberUids": { "type": "array", "description": "Denormalized list of approved family UIDs (max 7)." },
+        "lastSeenAt": { "type": "string", "format": "date-time", "description": "Server timestamp of last heartbeat." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp written via FieldValue.serverTimestamp()." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp written via FieldValue.serverTimestamp()." }
+      },
+      "required": ["ownerUid", "deviceName", "slotNumber", "status", "online", "currentChannel", "mode", "privateTargetDeviceId", "batteryLevel", "networkType", "adminDevice", "memberUids", "lastSeenAt", "createdAt", "updatedAt"]
+    },
+    "RadioChannel": {
+      "title": "RadioChannel",
+      "description": "One of the 6 group walkie-talkie channels with PTT floor lock for collision control.",
+      "type": "object",
+      "properties": {
+        "channelNumber": { "type": "integer", "description": "Channel index 1..6." },
+        "name": { "type": "string", "description": "Channel display label." },
+        "activeSpeakerDeviceId": { "type": "string", "description": "Device ID currently transmitting, or empty." },
+        "activeSpeakerName": { "type": "string", "description": "Name of device currently transmitting, or empty." },
+        "activeSpeakerUid": { "type": "string", "description": "UID of active speaker, or empty." },
+        "pttLockedAt": { "type": "string", "format": "date-time", "description": "Optional server timestamp when PTT floor was acquired." },
+        "memberUids": { "type": "array", "description": "Denormalized list of approved family UIDs (max 7)." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp written via FieldValue.serverTimestamp()." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp written via FieldValue.serverTimestamp()." }
+      },
+      "required": ["channelNumber", "name", "activeSpeakerDeviceId", "activeSpeakerName", "activeSpeakerUid", "memberUids", "createdAt", "updatedAt"]
+    },
+    "PrivateSession": {
+      "title": "PrivateSession",
+      "description": "Isolated 1-to-1 private walkie-talkie session between two approved devices.",
+      "type": "object",
+      "properties": {
+        "deviceAId": { "type": "string", "description": "Lexicographically smaller Device ID." },
+        "deviceBId": { "type": "string", "description": "Lexicographically larger Device ID." },
+        "participantUids": { "type": "array", "description": "1..2 UIDs permitted to access this private session." },
+        "activeSpeakerDeviceId": { "type": "string", "description": "Device ID currently speaking, or empty." },
+        "activeSpeakerName": { "type": "string", "description": "Display name of active speaker, or empty." },
+        "activeSpeakerUid": { "type": "string", "description": "UID of active speaker, or empty." },
+        "pttLockedAt": { "type": "string", "format": "date-time", "description": "Optional server timestamp when PTT floor was acquired." },
+        "active": { "type": "boolean", "description": "Whether private session is currently active." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp written via FieldValue.serverTimestamp()." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp written via FieldValue.serverTimestamp()." }
+      },
+      "required": ["deviceAId", "deviceBId", "participantUids", "activeSpeakerDeviceId", "activeSpeakerName", "activeSpeakerUid", "active", "createdAt", "updatedAt"]
+    },
+    "WebRtcSignal": {
+      "title": "WebRtcSignal",
+      "description": "WebRTC SDP Offer/Answer/ICE/BYE signaling message routed between two devices.",
+      "type": "object",
+      "properties": {
+        "roomId": { "type": "string", "description": "Target channel or private room identifier." },
+        "fromDeviceId": { "type": "string", "description": "Sender Device ID." },
+        "toDeviceId": { "type": "string", "description": "Recipient Device ID." },
+        "fromUid": { "type": "string", "description": "Sender Firebase Auth UID." },
+        "toUid": { "type": "string", "description": "Recipient Firebase Auth UID." },
+        "signalType": { "type": "string", "enum": ["OFFER", "ANSWER", "ICE", "BYE"], "description": "Signaling payload type." },
+        "sdp": { "type": "string", "description": "Session Description Protocol text for OFFER/ANSWER." },
+        "iceCandidate": { "type": "string", "description": "ICE candidate SDP string for ICE signals." },
+        "iceSdpMid": { "type": "string", "description": "ICE sdpMid string." },
+        "iceSdpMLineIndex": { "type": "integer", "description": "ICE sdpMLineIndex integer." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp written via FieldValue.serverTimestamp()." }
+      },
+      "required": ["roomId", "fromDeviceId", "toDeviceId", "fromUid", "toUid", "signalType", "sdp", "iceCandidate", "iceSdpMid", "iceSdpMLineIndex", "createdAt"]
+    },
+    "IceServerConfig": {
+      "title": "IceServerConfig",
+      "description": "Admin-managed STUN, TURN, and future SFU configuration.",
+      "type": "object",
+      "properties": {
+        "stunUrls": { "type": "array", "description": "List of STUN server URLs (max 6)." },
+        "turnUrl": { "type": "string", "description": "Optional TURN server URL." },
+        "turnUsername": { "type": "string", "description": "Optional TURN username." },
+        "turnCredential": { "type": "string", "description": "Optional TURN credential." },
+        "sfuEnabled": { "type": "boolean", "description": "Whether future SFU transport routing is enabled." },
+        "sfuUrl": { "type": "string", "description": "Optional SFU signaling endpoint URL." },
+        "memberUids": { "type": "array", "description": "Denormalized list of approved family UIDs (max 7)." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp written via FieldValue.serverTimestamp()." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp written via FieldValue.serverTimestamp()." }
+      },
+      "required": ["stunUrls", "turnUrl", "turnUsername", "turnCredential", "sfuEnabled", "sfuUrl", "memberUids", "createdAt", "updatedAt"]
+    },
+    "OtpVerification": {
+      "title": "OtpVerification",
+      "description": "Per-user hashed 6-digit Google Email OTP verification challenge.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "description": "Verified Google account email address." },
+        "deviceId": { "type": "string", "description": "Local walkie-talkie device ID undergoing verification." },
+        "otpHash": { "type": "string", "description": "64-character SHA-256 hex digest of uid:deviceId:otp." },
+        "verified": { "type": "boolean", "description": "Whether the 6-digit OTP has been verified for this device." },
+        "attempts": { "type": "integer", "description": "Failed verification attempts counter (0..5)." },
+        "expiresAtEpochMs": { "type": "integer", "description": "OTP expiration epoch timestamp in milliseconds." },
+        "deliveryStatus": { "type": "string", "enum": ["PENDING", "SENT", "FAILED"], "description": "Email delivery state." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp written via FieldValue.serverTimestamp()." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp written via FieldValue.serverTimestamp()." }
+      },
+      "required": ["email", "deviceId", "otpHash", "verified", "attempts", "expiresAtEpochMs", "deliveryStatus", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/admins/{adminUid}": {
+      "schema": { "$ref": "#/entities/AdminUser" },
+      "description": "Authorized admin accounts."
+    },
+    "/slots/{slotId}": {
+      "schema": { "$ref": "#/entities/DeviceSlot" },
+      "description": "Six fixed device slots (1..6) enforcing the maximum 6-device family cap."
+    },
+    "/devices/{deviceId}": {
+      "schema": { "$ref": "#/entities/WalkieDevice" },
+      "description": "Registered family walkie-talkie devices and live presence."
+    },
+    "/channels/{channelId}": {
+      "schema": { "$ref": "#/entities/RadioChannel" },
+      "description": "Six walkie-talkie group channels (channel_1..channel_6) with PTT floor lock."
+    },
+    "/private_sessions/{sessionId}": {
+      "schema": { "$ref": "#/entities/PrivateSession" },
+      "description": "Isolated 1-to-1 private walkie-talkie sessions."
+    },
+    "/webrtc_signals/{signalId}": {
+      "schema": { "$ref": "#/entities/WebRtcSignal" },
+      "description": "WebRTC SDP/ICE signaling messages."
+    },
+    "/settings/{configId}": {
+      "schema": { "$ref": "#/entities/IceServerConfig" },
+      "description": "Admin-managed STUN/TURN and SFU configuration (configId = ice_config)."
+    },
+    "/otp_verifications/{uid}": {
+      "schema": { "$ref": "#/entities/OtpVerification" },
+      "description": "Per-user Google Email 6-digit OTP verification challenge and verified state."
+    }
+  }
+}

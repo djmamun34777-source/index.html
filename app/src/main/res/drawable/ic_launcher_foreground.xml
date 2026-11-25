@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Antenna -->
+    <path
+        android:fillColor="#D4DEE8"
+        android:pathData="M39,22 L43,22 L44.5,36 L37.5,36 Z" />
+    <!-- Top Knob -->
+    <path
+        android:fillColor="#FFC800"
+        android:pathData="M61,28 L69,28 L69,36 L61,36 Z" />
+    <!-- Rugged Radio Body -->
+    <path
+        android:fillColor="#2D3741"
+        android:pathData="M34,35 L74,35 C76.8,35 79,37.2 79,40 L79,78 C79,81.3 76.3,84 73,84 L35,84 C31.7,84 29,81.3 29,78 L29,40 C29,37.2 31.2,35 34,35 Z" />
+    <!-- Green Backlit LCD Screen -->
+    <path
+        android:fillColor="#84E820"
+        android:pathData="M35,41 L73,41 C74.1,41 75,41.9 75,43 L75,54 C75,55.1 74.1,56 73,56 L35,56 C33.9,56 33,55.1 33,54 L33,43 C33,41.9 33.9,41 35,41 Z" />
+    <!-- LCD Signal & Channel Bars -->
+    <path
+        android:fillColor="#112408"
+        android:pathData="M37,49 L39,49 L39,53 L37,53 Z M41,47 L43,47 L43,53 L41,53 Z M45,45 L47,45 L47,53 L45,53 Z M52,46 L70,46 L70,48.5 L52,48.5 Z M52,50.5 L65,50.5 L65,52.5 L52,52.5 Z" />
+    <!-- Glowing Green PTT Outer Ring -->
+    <path
+        android:fillColor="#52FF00"
+        android:pathData="M54,60 A10,10 0 1,0 54,80 A10,10 0 1,0 54,60 Z" />
+    <!-- PTT Center Button -->
+    <path
+        android:fillColor="#141A1F"
+        android:pathData="M54,63 A7,7 0 1,0 54,77 A7,7 0 1,0 54,63 Z" />
+    <!-- Mic Glyph inside PTT -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,65.5 C55.2,65.5 56.2,66.5 56.2,67.7 L56.2,70.5 C56.2,71.7 55.2,72.7 54,72.7 C52.8,72.7 51.8,71.7 51.8,70.5 L51.8,67.7 C51.8,66.5 52.8,65.5 54,65.5 Z M53.2,73.5 L54.8,73.5 L54.8,75.2 L53.2,75.2 Z" />
+    <!-- RF Signal Arcs -->
+    <path
+        android:fillColor="#FFC800"
+        android:pathData="M24,44 C21.5,47 21.5,52 24,55 L25.6,53.6 C23.8,51.3 23.8,47.7 25.6,45.4 Z M84,44 L82.4,45.4 C84.2,47.7 84.2,51.3 82.4,53.6 L84,55 C86.5,52 86.5,47 84,44 Z" />
+</vector>

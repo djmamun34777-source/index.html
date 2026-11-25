@@ -1,0 +1,6 @@
+{
+  "name": "Mamun Walkie Talkie",
+  "description": "Private 6-device family push-to-talk live voice walkie-talkie with 6 channels, Group Mode, Private Mode, WebRTC audio, Firebase signaling, and Admin Panel.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
